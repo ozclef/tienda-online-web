@@ -1,0 +1,314 @@
+<!----¡Perfecto — te hice **una sola página HTML, limpia y lista para pegar** en tu repo! 🎉
+
+Qué hace este archivo:
+
+* Todo en 1: HTML + CSS + JS + datos (JSON embebido).
+* No hay IDs duplicados: uso solo unos pocos IDs necesarios y `data-` para tarjetas.
+* Intenta cargar `data/productos.json` si existe (modo preferido). Si no, usa el JSON embebido (funciona con `file://`).
+* Muestra los productos en cards y al hacer clic abre un panel de detalle accesible (sin navegar a otro archivo).
+* Soporta enlaces directos: `index.html#product=p1` abre el producto `p1`.
+* Galería: usa las imágenes de los productos para mostrar miniaturas que abren la imagen grande.
+* Código comentado y fácil de modificar.
+
+Copia todo (guardar como `index.html`) y reemplaza/añade tus imágenes en `imgs/` o actualiza `data/productos.json` en la carpeta `data/` si prefieres archivo externo.
+
+Aquí tienes el archivo:
+
+```html
+
+
+  ---->
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Huachu Pets — Productos (All-in-one)</title>
+  <style>
+    /* ---- Reset simple ---- */
+    *,*::before,*::after{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;font-family:Inter, system-ui, -apple-system, Arial;line-height:1.4;background:#f6f9fb;color:#07132a}
+    a{color:inherit;text-decoration:none}
+    .wrap{max-width:1100px;margin:28px auto;padding:18px}
+    header.top{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+    header .brand{display:flex;gap:12px;align-items:center}
+    header nav{margin-left:auto;display:flex;gap:10px}
+    header nav a{padding:8px 10px;border-radius:8px;background:#eaf4ff;color:#0366d6;font-weight:600}
+    h1{font-size:20px;margin:0}
+    /* ---- Utilities ---- */
+    .muted{color:#6b7785;font-size:13px}
+    .grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));margin-top:14px}
+    .card{background:#fff;border-radius:10px;padding:10px;box-shadow:0 6px 18px rgba(9,30,66,0.06);cursor:pointer;display:flex;flex-direction:column;gap:8px}
+    .card img{width:100%;height:140px;object-fit:cover;border-radius:8px}
+    .meta{display:flex;justify-content:space-between;align-items:center;gap:8px}
+    .price{font-weight:700;color:#0b3358}
+    .controls{display:flex;gap:8px;align-items:center;margin-top:8px}
+    .btn{background:#0b86ff;color:white;border:0;padding:8px 10px;border-radius:8px;cursor:pointer}
+    /* ---- Detail panel (overlay) ---- */
+    .overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:18px;pointer-events:none}
+    .panel{width:100%;max-width:980px;background:#fff;border-radius:12px;box-shadow:0 20px 50px rgba(2,6,23,0.25);overflow:hidden;display:grid;grid-template-columns:1fr 1fr;gap:18px;pointer-events:auto}
+    .panel .img-wrap img{width:100%;height:100%;object-fit:cover}
+    .panel .info{padding:18px}
+    .close-btn{position:absolute;right:18px;top:18px;background:#e6eef8;border-radius:8px;padding:6px 8px;border:0;cursor:pointer}
+    .overlay.hidden{display:none}
+    /* Responsive */
+    @media(max-width:800px){
+      .panel{grid-template-columns:1fr;max-height:90vh;overflow:auto}
+      .card img{height:120px}
+    }
+    /* gallery small */
+    .gallery{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+    .gallery a img{width:120px;height:80px;object-fit:cover;border-radius:8px}
+    /* small message box */
+    .info-row{display:flex;gap:8px;align-items:center}
+  </style>
+</head>
+<body>
+  <main class="wrap" id="app-root">
+    <header class="top" role="banner">
+      <div class="brand" aria-hidden="false">
+        <svg width="40" height="40" viewBox="0 0 24 24" aria-hidden="true">
+          <rect width="24" height="24" rx="6" fill="#0b86ff"></rect>
+        </svg>
+        <div>
+          <h1>Huachu Pets</h1>
+          <div class="muted">Tienda estática — HTML + CSS + JS</div>
+        </div>
+      </div>
+
+      <nav aria-label="principal">
+        <a href="#home" class="btn">Inicio</a>
+        <a href="#productos" class="btn">Productos</a>
+        <a href="#imgs" class="btn">Galería</a>
+      </nav>
+    </header>
+
+    <section aria-labelledby="destacados">
+      <h2 id="destacados">Productos destacados</h2>
+      <div class="info-row">
+        <div class="muted">Haz clic en una tarjeta para ver detalles (se abre un panel).</div>
+        <div class="controls" style="margin-left:auto">
+          <button id="reload-btn" class="btn" title="Forzar recarga de productos">Recargar</button>
+        </div>
+      </div>
+
+      <div id="products-grid" class="grid" aria-live="polite"></div>
+    </section>
+
+    <section aria-labelledby="gallery" style="margin-top:20px">
+      <h2 id="gallery">Galería (miniaturas)</h2>
+      <div id="gallery-wrap" class="gallery"></div>
+    </section>
+
+    <footer style="margin-top:22px;color:#6b7785">
+      <small>Si tienes `data/productos.json` en la carpeta <code>data/</code>, la página lo cargará automáticamente. Si no, usa los datos embebidos.</small>
+    </footer>
+  </main>
+
+  <!-- Overaly / panel de detalle (accesible) -->
+  <div id="detail-overlay" class="overlay hidden" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="panel" role="document" aria-labelledby="detail-title">
+      <div class="img-wrap" style="min-height:220px; background:#f4f6f8;">
+        <img id="detail-img" alt="">
+      </div>
+      <div class="info">
+        <h3 id="detail-title">Producto</h3>
+        <p id="detail-price" class="price"></p>
+        <p id="detail-desc" class="muted"></p>
+        <div style="margin-top:12px"><a id="detail-rawlink" target="_blank" rel="noopener">Abrir imagen en nueva pestaña</a></div>
+        <div style="margin-top:18px">
+          <button id="close-detail" class="btn">Cerrar</button>
+        </div>
+      </div>
+      <button id="close-x" class="close-btn" aria-label="Cerrar panel">✕</button>
+    </div>
+  </div>
+
+  <!-- JSON embebido (fallback si no hay data/productos.json) -->
+  <script id="productos-embedded" type="application/json">
+  [
+    {"id":"p1","nombre":"Collar para perro","precio":"$120","descripcion":"Collar ajustable color azul","img":"imgs/a93dc2b0-dddd-4c69-880a-69fb8320b86b.jpg"},
+    {"id":"p2","nombre":"Comida seca 5kg","precio":"$450","descripcion":"Comida balanceada 5kg","img":"imgs/sample-2.jpg"},
+    {"id":"p3","nombre":"Juguete de cuerda","precio":"$89","descripcion":"Duradero y divertido","img":"imgs/sample-3.jpg"}
+  ]
+  </script>
+
+  <script>
+  (function(){
+    'use strict';
+
+    // --- Configuración ---
+    const DATA_PATH = 'data/productos.json'; // si añades file, lo leerá
+    const embeddedScriptId = 'productos-embedded';
+
+    // --- Elementos ---
+    const grid = document.getElementById('products-grid');
+    const galleryWrap = document.getElementById('gallery-wrap');
+    const reloadBtn = document.getElementById('reload-btn');
+
+    const overlay = document.getElementById('detail-overlay');
+    const detailImg = document.getElementById('detail-img');
+    const detailTitle = document.getElementById('detail-title');
+    const detailPrice = document.getElementById('detail-price');
+    const detailDesc = document.getElementById('detail-desc');
+    const detailRawLink = document.getElementById('detail-rawlink');
+    const closeDetail = document.getElementById('close-detail');
+    const closeX = document.getElementById('close-x');
+
+    let productos = [];
+
+    // --- Helpers ---
+    function safeText(s){ return (s===null||s===undefined)?'':String(s); }
+    function buildCard(p){
+      const a = document.createElement('a');
+      a.className = 'card';
+      // use data-id instead of repeating ids
+      a.setAttribute('data-product-id', p.id);
+      a.href = '#product=' + encodeURIComponent(p.id); // change hash so can share link
+      a.innerHTML = `
+        <img loading="lazy" src="${p.img}" alt="${safeText(p.nombre)}">
+        <div class="meta">
+          <strong>${safeText(p.nombre)}</strong>
+          <span class="price">${safeText(p.precio)}</span>
+        </div>
+        <div class="muted">${safeText(p.descripcion)}</div>
+      `;
+      // click handled by hashchange (or default anchor)
+      return a;
+    }
+
+    function renderGrid(list){
+      grid.innerHTML = '';
+      list.forEach(p => grid.appendChild(buildCard(p)));
+    }
+
+    function renderGallery(list){
+      galleryWrap.innerHTML = '';
+      list.forEach(p=>{
+        const a = document.createElement('a');
+        a.href = p.img;
+        a.target = '_blank';
+        a.rel = 'noopener';
+        const img = document.createElement('img');
+        img.src = p.img;
+        img.alt = safeText(p.nombre);
+        a.appendChild(img);
+        galleryWrap.appendChild(a);
+      });
+    }
+
+    function openDetailById(id){
+      const p = productos.find(x=>x.id===id);
+      if(!p) return;
+      detailImg.src = p.img;
+      detailImg.alt = p.nombre || 'Producto';
+      detailTitle.textContent = p.nombre || 'Producto';
+      detailPrice.textContent = p.precio || '';
+      detailDesc.textContent = p.descripcion || '';
+      detailRawLink.href = p.img;
+      // show overlay
+      overlay.classList.remove('hidden');
+      overlay.setAttribute('aria-hidden','false');
+      // set focus to close button for accessibility
+      closeDetail.focus();
+    }
+
+    function closeDetailPanel(){
+      overlay.classList.add('hidden');
+      overlay.setAttribute('aria-hidden','true');
+      // remove hash without creating history entry
+      if(location.hash.startsWith('#product=')){
+        history.replaceState(null, '', location.pathname + location.search);
+      }
+    }
+
+    // --- Data loading: intenta externo, si falla usa embebido ---
+    async function loadProductos(){
+      // primero intentar fetch del archivo data/productos.json (si existe en repo)
+      try{
+        const res = await fetch(DATA_PATH + '?_=' + Date.now(), {cache:'no-store'});
+        if(res.ok){
+          const json = await res.json();
+          if(Array.isArray(json)) return json;
+          console.warn('data/productos.json no es un array, usar embebido');
+        } else {
+          console.info('No se encontró', DATA_PATH, 'status', res.status);
+        }
+      }catch(e){
+        console.info('No se pudo cargar', DATA_PATH, '->', e.message);
+      }
+      // fallback: JSON embebido
+      try{
+        const script = document.getElementById(embeddedScriptId);
+        return JSON.parse(script.textContent);
+      }catch(e){
+        console.error('Error parseando JSON embebido', e);
+        return [];
+      }
+    }
+
+    // --- Manejo de hash para abrir producto directo ---
+    function handleHash(){
+      const h = location.hash.replace(/^#/, '');
+      if(!h) { closeDetailPanel(); return; }
+      const m = h.match(/^product=(.+)$/);
+      if(m){
+        const id = decodeURIComponent(m[1]);
+        openDetailById(id);
+      } else {
+        closeDetailPanel();
+      }
+    }
+
+    // --- eventos ---
+    window.addEventListener('hashchange', handleHash);
+    closeDetail.addEventListener('click', closeDetailPanel);
+    closeX.addEventListener('click', closeDetailPanel);
+    // cerrar overlay con ESC
+    window.addEventListener('keydown', (ev)=>{
+      if(ev.key === 'Escape' && !overlay.classList.contains('hidden')) closeDetailPanel();
+    });
+
+    reloadBtn.addEventListener('click', async ()=>{
+      reloadBtn.disabled = true;
+      reloadBtn.textContent = 'Recargando...';
+      productos = await loadProductos();
+      renderGrid(productos);
+      renderGallery(productos);
+      reloadBtn.textContent = 'Recargar';
+      reloadBtn.disabled = false;
+    });
+
+    // inicializar
+    (async function init(){
+      productos = await loadProductos();
+      renderGrid(productos);
+      renderGallery(productos);
+      // abrir producto si hay hash en la URL
+      handleHash();
+    })();
+
+  })();
+  </script>
+</body>
+</html>
+
+
+<!---
+```
+
+---
+
+### Qué hacer ahora (sugerido)
+
+1. Guarda este archivo como `index.html` en la raíz del repo `portal/`.
+2. Crea la carpeta `imgs/` y pon tus JPGs ahí (usa exactamente los nombres que referencias en el JSON o cambia el JSON).
+3. (Opcional) Añade `data/productos.json` con el mismo formato si quieres gestionarlo separado. El `index.html` intentará cargar `data/productos.json` y si existe lo usará; si no, usa el JSON embebido.
+4. Para pruebas locales sin errores en `fetch`, ejecuta en la carpeta del repo:
+   `python -m http.server 5500` y abre `http://localhost:5500`.
+5. Si quieres que cada producto tenga su propia página `product.html`, lo convertimos en un segundo archivo con la misma lógica de lectura (muy fácil) — dímelo y lo hago.
+
+Si quieres que te lo deje también como archivo separado (`productos.html` + `product.html`) te lo armo igual de limpio — dime qué prefieres: todo en 1 (como el archivo arriba) o dividido en 3 archivos (index, productos, product).
+
+No eres tonta — todos aprendemos copiando y ajustando. 🙂 Si quieres, te preparo ahora el `data/productos.json` listo con las mismas entradas del HTML para que lo pegues en `data/`. ¿Lo quieres?
